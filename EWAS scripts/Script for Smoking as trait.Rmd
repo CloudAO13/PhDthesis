@@ -1,0 +1,247 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Step 1: Load packages. 
+```{r}
+library(data.table)
+library(ggplot2)
+library(future.apply)
+library(milorGWAS)
+library(xlsx)
+library(dplyr)
+library(lmerTest)
+library(future.apply)
+library(tidyverse)
+library(EpiDISH)
+library(reshape2)
+library(QCEWAS)
+library(ENmix)
+library(gridExtra)
+library(tibble)
+```
+
+Step 2: Load Beta and Meta files. 
+```{r}
+##Load beta and meta files. 
+beta312 <- readRDS("~/data/Round 4 Linear model/Beta312")
+meta312 <- read.xlsx("~/data/Round 7a - New MM - Mixed-model +iPDMR + Manual search/Metafile.xls", sheetIndex = 1)
+CpGmanifest <- readRDS("/data/amin/Round 5 Linear model - interaction variable/CpGmanifest")
+
+```
+
+
+Step 3: Generate cell-type PCAs
+```{r}
+data(centDHSbloodDMC.m)
+Celltypefraction <- epidish(beta.m = beta312, ref.m = centDHSbloodDMC.m, method = "RPC")$estF
+Celltypefraction <- as.data.frame(Celltypefraction)
+celltypePCA <- prcomp(Celltypefraction, center= TRUE, scale.=TRUE)
+summary(celltypePCA)
+##Extract PCAs of IDs into a new dataframe
+celltypePCAvaluesonly <- as.data.frame(celltypePCA[["x"]])
+celltypePCAvaluesonly= mutate(celltypePCAvaluesonly, "Basename" = row.names(celltypePCAvaluesonly))
+saveRDS(celltypePCAvaluesonly, file="celltypePCAvaluesonly_epidish")
+```
+
+Step 4: Create meta and beta files for different models. 
+```{r}
+meta312 = left_join(meta312, celltypePCAvaluesonly, by = "Basename")
+meta312$Year <- as.character(meta312$Year)
+meta312$Id <- as.character(meta312$Id)
+
+## For Year 4 and 5 only
+metayear4and5 <- meta312[meta312$Year==4 |meta312$Year==5,]
+betayear4and5=beta312[,colnames(beta312) %in% metayear4and5$Basename] #choose the subset of samples 
+betayear4and5=betayear4and5[,match(metayear4and5$Basename,colnames(betayear4and5))]
+
+```
+
+
+Step 5: Create function for mixed-effect models. 
+```{r}
+lmer_func=function(dataset,pd,rhs_formula,testL)
+{
+  pd$cpg=as.numeric(t(dataset))
+  pd=as.data.frame(pd)
+  if (!(is.null(testL))) {
+    me_model=lmer(as.formula(paste("cpg ~ ", rhs_formula,sep="")),pd) # create model object
+    r1=fixef(me_model) # model coefficients for fixed effects
+    r2=contest1D(model = me_model,L = testL,confint = TRUE) 
+    c(as.numeric(r1),as.numeric(r2))  
+  } else {
+    me_model=lm(as.formula(paste("cpg ~ ", rhs_formula,sep="")),pd)
+    mes = summary(me_model)
+    df = me_model$df.residual
+    ms = mes$coefficients
+    mc = confint(me_model)
+    traitInd = nrow(mc)
+    c(ms[,1],ms[traitInd,c(1,2)],df,ms[traitInd,3],mc[traitInd,],ms[traitInd,4])
+  }
+}
+
+ewas_mixed_model=function(dataset,meta,trait_name,fixed_effects,random_effects,fit_slope=FALSE)
+{
+  ###############################################
+  # define fixed and random effects for the model
+  ###############################################
+  fixed_effects_=c(fixed_effects,trait_name) # trait_name is case-control variable name
+  
+  fe_formula=paste(fixed_effects_,collapse = " + ")
+  if (length(random_effects)>0) {
+    if (fit_slope){
+      re_formula=paste("(",paste(trait_name,random_effects,sep = "|",collapse = ") + ("),")",sep="")}
+    else{
+      re_formula=paste("(",paste("1",random_effects,sep = "|",collapse = ") + ("),")",sep="")}
+    rhs_formula = paste(fe_formula,re_formula,sep = " + ")
+    testL = rep(0,length(fixed_effects_))
+    testL = c(testL,1)
+  } else {
+    rhs_formula = fe_formula
+    testL = NULL
+    
+  }  
+  print(paste("Effects are defined. Fixed effects are ", paste(fixed_effects_,sep=', '), ". Random effects are ", paste(random_effects,sep=', '), ".", sep=""))
+  
+  ############################### 
+  # prepare data to run the model
+  ###############################  
+  pd=as.data.frame(meta)[c(fixed_effects_,random_effects)] # extract dataset to from metadata to plug in into model
+  ###
+  pdc = colnames(pd)
+  # Drop samples without metadata
+  exclude_samples=(as.data.frame(pd)[trait_name]!="") # boolean vectors with FALSE for samples with missing trait
+  pd=pd[exclude_samples,]
+  dataset=dataset[,exclude_samples]
+  pd=as.data.frame(pd)
+  colnames(pd) = pdc
+  dataset=as.data.frame(dataset)
+  ###
+  # run model
+  print("planning multisession...")
+  print(Sys.time())
+  plan("future::multisession")
+  print("multisession planned, sorry for the delay. Now running EWAS.")
+  tts=future_apply(as.data.frame(dataset), MARGIN = 1, FUN = lmer_func,pd=pd, rhs_formula=rhs_formula, testL = testL)
+  print("nearly done...")
+  tts=t(tts)
+  # "sexMale","w3_age","age_diff","w3_diabetes1"
+  colnames(tts)=c("(Intercept)",fixed_effects_,"Estimate","Std. Error","df","t value","lower","upper","Pr(>|t|)")
+  #print("done!")
+  return(tts)
+}
+```
+
+Step 6: Run models looking at Smoking as trait. 
+```{r}
+trait_name="Smoke" 
+fixed_effects=c("PC1","PC2","PC3","PC4", "Sex","Age")
+random_effects= c("Id", "Sentrix_ID","Sentrix_Position", "Year")
+
+
+# Smoking Model: Mixed-Effect model of smoking in all participants Fixed effects: Age, Sex, and cell types. Random effects: Year, Id, Slide & Array position.
+smoke_model=ewas_mixed_model(dataset=as.data.frame(beta312),meta=meta312,trait_name = trait_name,fixed_effects = fixed_effects, random_effects = random_effects,fit_slope = FALSE)
+print(Sys.time())
+print("Smoke Model is done!")
+
+
+results_path=paste(getwd(),"Smoke",sep="/") # where to write files, 
+images=paste(results_path,"/","qqplots",".pdf",sep="")
+
+```
+
+Step 7: Save data frames of p-values generated from mixed-effect models and generate pdf with QQ-plots of p-values. 
+```{r}
+fwrite(as.data.frame(smoke_model),paste(results_path,"smoke_model.csv",sep="/"),row.names = TRUE,col.names = TRUE)
+
+
+
+pdf(file = images)
+qqplot.pvalues(smoke_model[,ncol(smoke_model)], ylim=c(0,8))
+dev.off()
+
+smoke_model<-as.data.frame(smoke_model)
+smoke_model_year4and5 <- as.data.frame(smoke_model_year4and5)
+P_lambda(smoke_model$`Pr(>|t|)`)
+P_lambda(smoke_model_year4and5$`Pr(>|t|)`)
+
+```
+
+
+Step 9: Load up reference smoking manifest. 
+```{r}
+## Smoking CpGs from meta-file
+SmokingCpGs <-read.xlsx("/data/amin/Round 7b - Targetted CpG search and power analysis/Joehanes et al - smoking CpGs.xlsx", sheetIndex = 1)
+SmokingCpGs$Beta <- as.numeric(SmokingCpGs$Beta)
+###
+SmokingCpGs_CostaRica <-read.xlsx("Cardenas - Smoking CpGs - Costarica (2022).xlsx", sheetIndex = 1)
+SmokingCpGs_CostaRica <- rename(SmokingCpGs_CostaRica, "Beta" = "coefficient" )
+SmokingCpGs_CostaRica$Beta <- as.numeric(SmokingCpGs_CostaRica$Beta)
+```
+
+
+Step 10: Load up model smoking CpG file. 
+```{r}
+## All
+smoke_model <- read.csv("/data/amin/Round 7e - Smoking as trait + Check of published CpGs/Smoke/smoke_model.csv")
+smoke_model$Smoke <- as.numeric(smoke_model$Smoke)
+smoke_model <- mutate(smoke_model, Significant = "N")  
+smoke_model <- rename(smoke_model, "Pr...t.."="p-value")
+smoke_model$Significant[smoke_model$`p-value`<=0.05] <- "Y"
+
+```
+
+
+Step 11: Interrogation of CpGs
+```{r}
+SmokingCpGs_model <- left_join(SmokingCpGs, smoke_model[, c("X","Smoke", "lower","upper","p-value", "Significant")], by = c("CpG" = "X"))
+SmokingCpGs_model <- na.omit(SmokingCpGs_model)
+SmokingCpGs_model <- mutate(SmokingCpGs_model, Beta_correlate="Y")
+SmokingCpGs_model$Beta_correlate[(SmokingCpGs_model$Beta*SmokingCpGs_model$Smoke)<=0] <- "N"
+SmokingCpGs_model <- arrange(SmokingCpGs_model, desc(Significant))
+SmokingCpGs_model <- arrange(SmokingCpGs_model, `p-value`)
+
+
+
+## Costa Rican smoking CpGs
+SmokingCpGs_CostaRica_model <- left_join(SmokingCpGs_CostaRica, smoke_model[, c("X","Smoke", "lower","upper","p-value", "Significant")], by = c("CpG" = "X"))
+SmokingCpGs_CostaRica_model <- na.omit(SmokingCpGs_CostaRica_model)
+SmokingCpGs_CostaRica_model <- mutate(SmokingCpGs_CostaRica_model, Beta_correlate="Y")
+SmokingCpGs_CostaRica_model$Beta_correlate[(SmokingCpGs_CostaRica_model$Beta*SmokingCpGs_CostaRica_model$Smoke)<=0] <- "N"
+SmokingCpGs_CostaRica_model <- arrange(SmokingCpGs_CostaRica_model, desc(Significant))
+SmokingCpGs_CostaRica_model <- arrange(SmokingCpGs_CostaRica_model, `p-value`)
+SmokingCpGs_CostaRica_model$lower <- formatC(SmokingCpGs_CostaRica_model$lower, format = "e", digits = 2)
+SmokingCpGs_CostaRica_model$upper <- formatC(SmokingCpGs_CostaRica_model$upper, format = "e", digits = 2)
+SmokingCpGs_CostaRica_model$Smoke <- formatC(SmokingCpGs_CostaRica_model$Smoke, format = "e", digits = 2)
+
+write.csv(SmokingCpGs_CostaRica_model, "SmokingCpGs_CostaRica_model.csv")
+
+```
+
+Step 12: Print pdf of models - All CpGs
+```{r}
+tt = ttheme_default(base_size = 10)
+pdf("Smoking_MM_CpGs.pdf")       # Export PDF
+plot.new()
+text(0.5, 0.5, "SmokingCpGs_model All years", cex=2)
+plot.new()
+grid.table(SmokingCpGs_model[1:12, c("CpG","Beta","Smoke","lower","upper","p-value", "Significant", "Beta_correlate" )] , title("Smoking CpGs - Joehanes et al"), theme= tt)
+plot.new()
+grid.table(SmokingCpGs_model[13:23, c("CpG","Beta","Smoke","lower","upper","p-value", "Significant" , "Beta_correlate")] , title("Smoking CpGs - Joehanes et al"), theme= tt)
+dev.off()
+```
+
+Step 13: Print pdf of models - All Costa-Rican CpGs 
+```{r}
+tt = ttheme_default(base_size = 10)
+pdf("Smoking_MM_CostaRicanCpGs.pdf")       # Export PDF
+plot.new()
+text(0.5, 0.5, "SmokingCpGs_CostaRica_model All years", cex=2)
+plot.new()
+grid.table(SmokingCpGs_CostaRica_model[1:23, c("CpG","Beta","Smoke","lower","upper","p-value", "Significant", "Beta_correlate" )] , title("Smoking CpGs - Cardenas et al"), theme= tt)
+plot.new()
+grid.table(SmokingCpGs_CostaRica_model[24:45, c("CpG","Beta","Smoke","lower","upper","p-value", "Significant" , "Beta_correlate")] , title("Smoking CpGs - Cardenas et al"), theme= tt)
+
+dev.off()
+```
