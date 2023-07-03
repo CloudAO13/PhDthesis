@@ -1,0 +1,184 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Step 1 - Load packages
+```{r}
+library(ENmix)
+library(minfi)
+library(ChAMP)
+library(readxl)
+library(tidyverse)
+library(dplyr)
+```
+
+Step 2 - Load idat data and sheet data
+
+```{r}
+path = "/data/amin/Quality control/All plates"
+sheet <- read_excel("master_samplesheet - Run 6.xls") 
+##NB: Ignore warning in readChar(Con, nchars = n) error
+rgSet <- read.metharray.exp(base = path, recursive = TRUE, targets = sheet, extended = TRUE)
+##NB: Ignore warning in readChar(Con, nchars = n) error
+rawbetas <- getBeta(rgSet)
+```
+
+Step 3 & 4  - Step 3: Automatic QC to remove samples with poor detection P=values, intensities for bisufite conversion of probes and number of beads, Step 4: Background correction and dye-bias correction. 
+````{r}
+library(ENmix)
+library(minfi)
+qc<-QCinfo(rgSet)
+## This generates a list qc, of samples and CpGs that faile QC :  detection P values, average intensities for bisulfite conversion probes and number of beads for each methylation read. QCinfo will identify a list of low quality samples and CpG probes as wells as outlier samples based on total intensity or beta value distribution
+##Default values: 
+###QCinfo(rgSet, detPthre=0.000001, nbthre=3, samplethre=0.05, CpGthre=0.05, bisulthre=NULL, outlier=TRUE, distplot=TRUE)
+mdat<-preprocessENmix(rgSet, bgParaEst="oob", dyeCorr="RELIC", QCinfo=qc, exCpG=NULL, nCores=20)
+##Filter out samples that have failed QC. 
+````
+
+Step 5 - Inter-array normalization, 
+
+```{r}
+mdat<-norm.quantile(mdat, method="quantile1")
+##Normalisation of samples between arrays (8 arrays in each slide)
+
+```
+
+Step 6 - Probe-type bias adjustment and generation of beta values. 
+
+```{r}
+beta<-rcp(mdat, qcscore=qc)
+## NB: If decision is to not adjust for probe-type bias (as analysis may not require it), function to use is getB in place of rcp, this will generate beta values from mdat.
+```
+
+Step 7 - Generate list of multi-modal CpGs and excluding them from Beta file. 
+```{r}
+nmode<- nmode(beta, minN = 3, modedist=0.2, nCores = 20)
+## This gives list of CpGs which have a multimodal distribution (i.e. due to poor quality prove design or due to SNPs in study population). If probes are gap probes they have a score of >1
+nmode_multimodallist <- data.frame(subset(nmode, nmode>1))
+## creates list of CpGs that have nmode>1 (are therefore multimodal
+beta_nmode_removed <- data.matrix(beta[!(row.names(beta) %in% rownames(nmode_multimodallist)),])
+## removes list of unwanted CpGs found in the remove_list (nmode_multimodalist) from the beta list and generates a new matrix of betas
+
+```
+
+Step 8 -  Filtering outliers, low quality data points, missing values and imputation
+```{r}
+beta_filt_removed=qcfilter(beta_nmode_removed,qcscore=qc,rmcr=TRUE,rthre=0.05, cthre=0.05,impute=TRUE)
+#filter out low quality and outlier values (more than 3 IQR from upper/lower quartiles), and then removes out the remove rows and columns with too many (rthre=0.05,cthre=0.05, 5% is default) missing values if rmcr=TRUE, and then do imputation to replace the NA value with the msot-likely/closest value. Then this replaces original beta file. If rmcr=false, columns not removed. 
+sum(beta_filt_removed>1)+sum(beta_filt_removed<0)
+#Gives total number of betas with values of less than 0 or more than 1. 
+beta_filt_NA_kept=qcfilter(beta,qcscore=qc,rmcr=FALSE,rthre=0.05, cthre=0.05,impute=FALSE)
+#flag up NA values but does not remove columns with multiple NAs and does not impute values either 
+na_data=is.na(beta_filt_NA_kept)
+na_samples_col=colSums(na_data)
+na_samples_row=rowSums(na_data)
+## to check the proportion of betas that are NA (NB: this is pre-outliers) failing QC manually
+samples_removed_from_qcfilter <-data.frame(sheet[!(sheet$Basename %in% colnames(beta_filt_remove)),])
+## gives list of samples (columns) that have been removed
+```
+
+
+Step 9 - Principal component analysis of batches and 
+
+```{r}
+cov<-data.frame(plate=factor(colData(mdat)$Sample_Plate), slide=factor(colData(mdat)$Sentrix_ID), Sex=factor(colData(mdat)$Sex), Age=(colData(mdat)$Age), Community=factor(colData(mdat)$Community), Year=(colData(mdat)$Year), Id=factor(colData(mdat)$Id), GFR=colData(mdat)$eGFR_cre)
+pcrplot(beta_filt_removed, cov, npc=10)
+## $Project here is each plate (this is Sample_Group in isntrucitons, but our array data lists sample group as 1 for all four plates), $Sentrix_ID ($Slide in reference script) pertains to the actual to each slide.
+##NB: Inter-array normalisation already performed in step 8
+
+```
+
+Step 10 - Generate list of non-negative control surrogate variables for batch effects and unknown experimental 
+```{r}
+sva<-ctrlsva(rgSet)
+#This generates list of PCAs (7) from non-negative controls that give a surrogate variable of just the technical variation between the arrays (detected by looking at the signal from just non-negative controls.) 
+#ctrlsva(rgSet,percvar=0.95,npc=1,flag=1)
+sva_3components<- ctrlsva(rgSet,percvar=0.95,npc=1,flag=1)
+sva_3components <-data.frame(sva_3components)
+## npc = number of surrogate variables, percvar = Minimum percentage of data variations. Flag 1: select number of surrogate variables based on argument percvar; 2: select number of surrogate variables based on argument npc.
+```
+
+
+Step 11: Generating Cell Types and generating PCA of it 
+```{r}
+library(EpiDISH)
+library(xlsx)
+library(dplyr)
+data(centDHSbloodDMC.m)
+Celltypefraction <- epidish(beta.m = betas, ref.m = centDHSbloodDMC.m, method = "RPC")$estF
+boxplot(Celltypefraction)
+celltypePCA <- prcomp(Celltypefraction, center= TRUE, scale.=TRUE)
+summary(celltypePCA)
+##Extract PCAs of IDs into a new dataframe
+celltypePCAvaluesonly <- as.data.frame(celltypePCA[["x"]])
+## Merge PCAs onto meta files
+celltypePCAvaluesonly= mutate(celltypePCAvaluesonly, "Basename" = row.names(celltypePCAvaluesonly))
+metaPCA = left_join(meta, celltypePCAvaluesonly, by = "Basename") 
+```
+
+Step 12 - Export required documents
+```{r}
+### saveRDS(object, file = "my_data.rds") allows R files to be saved as R files to be re-imported into other projects
+saveRDS(beta_filt_removed, file = "QC passed Betas (no batch correction.rds")
+saveRDS(celltype, file = "Calculated celltype of samples.rds")
+saveRDS(sva_3components, file = "Surrogate variable PCA.rds")
+
+```
+
+
+
+Appendix 1 - Counting distributions in slides and plates
+```{r}
+slide_sheetdata <- sheet %>% group_by(Sentrix_ID) %>% 
+     summarise(
+         count =n(),
+         Sex = sum(Sex == "Male"),
+    mean_age_at_recruitment = mean(Age_at_recruitment),
+    Year_0 = sum(Year==0),
+    Year_0.5 = sum(Year==0.5),
+    Year_4 = sum(Year== 4),
+    Year_5 = sum(Year== 5),
+    Incidentcase = sum(IncidentKidneydisease==1, na.rm=TRUE),
+    Establishedcase = sum(Establishedkidneydisease==1, na.rm=TRUE),
+     Controls = sum(IncidentKidneydisease==0, na.rm=TRUE),
+    mean_transition_year = mean(Transition, na.rm=TRUE),
+    mean_timesincetransition = mean(timesincetransition, na.rm=TRUE)
+     )
+## Slide_sheet data is break down of variables on each slide
+plate_sheetdata <- sheet %>% group_by(Sample_Plate) %>% 
+     summarise(
+         count =n(),
+    Sex = sum(Sex == "Male"),
+    mean_age_at_recruitment = mean(Age_at_recruitment),
+    Year_0 = sum(Year==0)/count,
+    Year_0.5 = sum(Year==0.5)/count,
+    Year_4 = sum(Year== 4)/count,
+    Year_5 = sum(Year== 5)/count,
+    Incidentcase = sum(IncidentKidneydisease==1, na.rm=TRUE)/count,
+    Establishedcase = sum(Establishedkidneydisease==1, na.rm=TRUE)/count,
+    Controls = sum(IncidentKidneydisease==0, na.rm=TRUE)/count,
+    Year_0_incident_cases = sum(Year==0 & IncidentKidneydisease==1, na.rm=TRUE)/count,
+    Year_0.5_incident_cases = sum(Year==0.5 & IncidentKidneydisease==1, na.rm=TRUE)/count,
+    Year_4_incident_cases = sum(Year== 4 & IncidentKidneydisease==1, na.rm=TRUE)/count,
+    Year_5_incident_cases = sum(Year== 5 & IncidentKidneydisease==1, na.rm=TRUE)/count,
+  Year_0_controls = sum(Year==0 & IncidentKidneydisease==0, na.rm=TRUE)/count,
+    Year_0.5_controls = sum(Year==0.5 & IncidentKidneydisease==0, na.rm=TRUE)/count,
+    Year_4_controls = sum(Year== 4 & IncidentKidneydisease==0, na.rm=TRUE)/count,
+    Year_5_controls = sum(Year== 5 & IncidentKidneydisease==0, na.rm=TRUE)/count,
+  Year_0_established_cases = sum(Year==0 & Establishedkidneydisease==1, na.rm=TRUE)/count,
+    Year_0.5_established_cases = sum(Year==0.5 & Establishedkidneydisease ==1, na.rm=TRUE)/count,
+    Year_4_established_cases = sum(Year== 4 & Establishedkidneydisease ==1, na.rm=TRUE)/count,
+    Year_5_established_cases = sum(Year== 5 & Establishedkidneydisease ==1, na.rm=TRUE)/count,
+      mean_transition_year = mean(Transition, na.rm=TRUE),
+    mean_timesincetransition = mean(timesincetransition, na.rm=TRUE),
+        )
+   
+
+
+library("xlsx")
+write.xlsx(plate_sheetdata, file="data summary of plate and slides.xlsx", sheetName = "Plates", append=TRUE)
+write.xlsx(slide_sheetdata, file="data summary of plate and slides.xlsx", sheetName = "Slides", append=TRUE)
+##writes both dataframes into an excel spreadsheet
+
+```
+
