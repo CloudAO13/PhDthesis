@@ -1,0 +1,339 @@
+---
+title: "Power calculations for t-test for Amin's project"
+output: html_notebook
+---
+
+### Description
+Here we calculate the effect sizes for our data, which we can detect with 80% power using t-test for beta-values adjusted using models A and B.
+We also check the power to detect differences (using t-test) in a subset of CpGs, which came from the literature.
+
+## Loading libraries
+```{r}
+library(data.table)
+library(pwr)
+library(ggplot2)
+library(ggpubr)
+```
+
+## Setting paths
+Change to your paths (folders should exist)
+
+```{r}
+data_path = "~/YOUR/PATH/"
+results_path = "~/YOUR/PATH/"
+images_path = "~/YOUR/PATH/"
+```
+
+## Loading the data
+```{r}
+load(paste(data_path,"adjusted_modelA_sd.RData",sep = ""))
+load(paste(data_path,"adjusted_modelB_sd.RData",sep = ""))
+
+adjusted_modelA_cases_sd = adjusted_modelA_case_sd[[1]]
+adjusted_modelA_control_sd = adjusted_modelA_control_sd[[1]]
+
+adjusted_modelB_cases_sd = adjusted_modelB_case_sd[[1]]
+adjusted_modelB_control_sd = adjusted_modelB_control_sd[[1]]
+
+```
+
+## Calculating pooled SDs for every CpG
+```{r}
+n_case_A = sum(grouping1=="1") #number of cases
+n_control_A = sum(grouping1=="0") #number of controls
+pooled_sd_A = sqrt(((n_case_A-1)*adjusted_modelA_case_sd^2+(n_control_A-1)*adjusted_modelA_control_sd^2)/(n_case_A+n_control_A-2))
+
+n_case_B = sum(grouping2=="1") #number of cases
+n_control_B = sum(grouping2=="0") #number of controls
+pooled_sd_B = sqrt(((n_case_B-1)*adjusted_modelB_case_sd^2+(n_control_B-1)*adjusted_modelB_control_sd^2)/(n_case_B+n_control_B-2))
+
+```
+
+
+## Creating data for power analysis
+```{r}
+ds=data.frame()
+ds=rbind(ds, c("A",n_case_A,n_control_A,mean(pooled_sd_A[,1]), median(pooled_sd_A[,1])))
+ds=rbind(ds, c("B",n_case_B,n_control_B,mean(pooled_sd_B[,1]), median(pooled_sd_B[,1])))
+ds[,2:5] = apply(ds[,2:5], MARGIN = 2, as.numeric)
+colnames(ds) = c("Model ID", "n, cases", "n, controls", "Pooled SD, mean","Pooled SD, median" )
+ds
+```
+
+## Power Analysis
+```{r}
+p = seq(0.01,1,by = 0.01)
+
+# ModelA
+dd_a = p
+for (i in 1:length(p)) {
+  dd_a[i] = pwr.t2n.test(n1 = n_case_A, n2 = n_control_A,power = p[i],sig.level = 0.05/832813)[[3]]
+}
+plot_ds_a = as.data.frame(cbind(p,dd_a,dd_a*ds$`Pooled SD, mean`[1],dd_a*ds$`Pooled SD, median`[1]))
+names(plot_ds_a) = c("power","effect_size_d","effect_size_sd_mean","effect_size_sd_median")
+
+# ModelB
+dd_b = p
+for (i in 1:length(p)) {
+  dd_b[i] = pwr.t2n.test(n1 = n_case_B, n2 = n_control_B,power = p[i],sig.level = 0.05/832813)[[3]]
+}
+plot_ds_b = as.data.frame(cbind(p,dd_b,dd_b*ds$`Pooled SD, mean`[2],dd_b*ds$`Pooled SD, median`[2]))
+names(plot_ds_b) = c("power","effect_size_d","effect_size_sd_mean","effect_size_sd_median")
+
+# Combined dataset for both models
+plot_ds = as.data.frame(cbind(c(rep("A",100),rep("B",100)),rbind(plot_ds_a,plot_ds_b)))
+names(plot_ds)[1] = "model"
+
+```
+
+## Plotting power vs effect size
+# Plot for Model A
+```{r}
+plot_a = ggplot(plot_ds_a, aes(y = power, x = effect_size_d)) +
+  geom_line() + theme_bw() +
+  theme_minimal() +
+  geom_hline(yintercept = .8,lty=2, color='blue') +
+  #geom_point() +
+  labs(title="Model A t-test Power Curve for Power vs Effect Size",
+       y="Power",
+       x="Effect size, Cohen's d")
+plot_a
+```
+# Plot for Model B
+```{r}
+plot_b = ggplot(plot_ds_b, aes(y = power, x = effect_size_d)) +
+  geom_line() + theme_bw() +
+  theme_minimal() +
+  geom_hline(yintercept = .8,lty=2, color='blue') +
+  #geom_point() +
+  labs(title="Model B t-test Power Curve for Power vs Effect Size",
+       y="Power",
+       x="Effect size, Cohen's d")
+plot_b
+```
+# Two models together 
+Probably, the individual plot titles should be removed or shortened (in previous plots)
+```{r}
+ggarrange(plot_a,plot_b,
+           ncol = 2, labels = "AUTO")
+ggsave(filename = paste(results_path,"power_curve_models_two_panels.png", sep=""),width = 14, height = 7,units = "in")
+```
+# All lines on the same plot (for Cohen's d)
+```{r}
+plot_all = ggplot(plot_ds, aes(y = power, x = effect_size_d, group = model)) +
+  geom_line(aes(color=model)) + theme_bw() +
+  theme_minimal() +
+  geom_hline(yintercept = .8,lty=2, color='blue') +
+  #geom_point() +
+  labs(title="t-test Power Curves for Power vs Effect Size",
+       y="Power",
+       x="Effect size, Cohen's d")
+ggsave(plot = plot_all,filename = paste(results_path,"power_curve_2models_together.png", sep=""))
+plot_all
+
+```
+
+# All lines on the same plot (for mean standard deviation)
+```{r}
+plot_all_mean = ggplot(plot_ds, aes(y = power, x = effect_size_sd_mean, group = model)) +
+  geom_line(aes(color=model)) + theme_bw() +
+  theme_minimal() +
+  geom_hline(yintercept = .8,lty=2, color='blue') +
+  #geom_point() +
+  labs(title="t-test Power Curves for Power vs Effect Size",
+       y="Power",
+       x="Effect size, delta beta (mean SD)")
+ggsave(plot = plot_all_mean,filename = paste(images_path,"all_models_mean_sd.png",sep=""))
+
+ggsave(plot = plot_all_mean,filename = paste(results_path,"power_curve_2models_together_mean.png",sep=""))
+
+plot_all_mean
+
+```
+
+## Calculating our observed Cohen's d (from data)
+
+## Loading the data
+```{r}
+load(paste(data_path,"adjusted_modelA_mean.RData",sep = ""))
+load(paste(data_path,"adjusted_modelB_mean.RData",sep = ""))
+
+adjusted_modelA_case_mean = adjusted_modelA_case_mean[[1]]
+adjusted_modelA_control_mean = adjusted_modelA_control_mean[[1]]
+
+adjusted_modelB_case_mean = adjusted_modelB_case_mean[[1]]
+adjusted_modelB_control_mean = adjusted_modelB_control_mean[[1]]
+```
+
+## Calculating effect sizes in our data
+
+```{r}
+es_data_a = abs(adjusted_modelA_case_mean - adjusted_modelA_control_mean)/pooled_sd_A[[1]]
+
+es_data_b = abs(adjusted_modelB_case_mean - adjusted_modelB_control_mean)/pooled_sd_B[[1]]
+
+es_data = as.data.frame(cbind(es_data_a, es_data_b))
+
+colnames(es_data) = c("a", "b")
+head(es_data)
+```
+
+```{r}
+sig_threshold = 0.05/832813
+power_modelA = pwr.t2n.test(n1 = 73, n2 = 203, sig.level = sig_threshold,power = 0.8)
+power_modelB = pwr.t2n.test(n1 = 109, n2 = 203, sig.level = sig_threshold,power = 0.8)
+
+power_modelA
+power_modelB
+
+```
+
+
+```{r}
+es_hist_a = 
+  ggplot(es_data, aes(x=a))+
+  geom_histogram(color="darkblue", fill="lightblue",bins = 80)+
+  #geom_histogram(aes(y=..density..),color="darkblue", fill="lightblue")+
+  #geom_density(alpha=.5, fill = "#34e8eb") +
+  labs(x= "Effect size, Cohen's 𝑑") +
+  geom_vline(aes(xintercept=power_modelA$d), color = "red", size = 1)+
+  theme_bw()
+
+es_hist_b = 
+  ggplot(es_data, aes(x=b))+
+  geom_histogram(color="darkblue", fill="lightblue",bins = 80)+
+  #geom_histogram(aes(y=..density..),color="darkblue", fill="lightblue")+
+  #geom_density(alpha=.5, fill = "#34e8eb") +
+  labs(x= "Effect size, Cohen's 𝑑") +
+  geom_vline(aes(xintercept=power_modelB$d), color = "red", size = 1)+
+  theme_bw()
+
+es_hist = ggarrange(es_hist_a, es_hist_b,nrow = 2,  labels = c("A","B")) ## Copy-paste to the console if error occur
+
+ggsave(es_hist, filename = paste(results_path,"es_histograms.png", sep = ""), width = 7, height = 7, units = "in", dpi = 300)  ## Copy-paste to the console if error occur
+es_hist
+
+```
+
+
+
+
+
+## Means and SD for the table
+# Cohen's d
+```{r}
+print(paste(round(mean(es_data_a),5)," (", round(sd(es_data_a),5),")",sep=""))
+print(paste(round(mean(es_data_b),5)," (", round(sd(es_data_b),5),")",sep=""))
+```
+# delta beta
+```{r}
+print(paste(round(mean(abs(adjusted_modelA_case_mean - adjusted_modelA_control_mean)),5)," (", round(sd(abs(adjusted_modelA_case_mean - adjusted_modelA_control_mean)),5),")",sep=""))
+print(paste(round(mean(abs(adjusted_modelB_case_mean - adjusted_modelB_control_mean)),5)," (", round(sd(abs(adjusted_modelB_case_mean - adjusted_modelB_control_mean)),5),")",sep=""))
+```
+# Number of CpGs with Cohen's d above returned by power analysis
+```{r}
+print(sum(es_data_a>power_modelA$d))
+print(sum(es_data_b>power_modelB$d))
+```
+# Numbers of CpGs with delta betas above returned by power analysis
+```{r}
+print(sum(abs(adjusted_modelA_case_mean - adjusted_modelA_control_mean)>0.00133))
+print(sum(abs(adjusted_modelB_case_mean - adjusted_modelB_control_mean)>0.00117))
+```
+
+## Working with CpGs from literature
+
+Loading the data
+```{r}
+# Loading list of all our CpGs and CpGs from the literature
+cpgs_list = (readRDS(paste(data_path,"list_of_CpGs.rds", sep="")))[[1]] # list of all our CpGs - change to your file
+cpgs_from_papers = fread(paste(data_path,"cpgs_from_literature_exposures.csv",sep=""), header = TRUE) # CpGs from the literature - change to your file
+```
+
+
+```{r}
+cpgs_from_papers$effect_size = as.numeric(cpgs_from_papers$effect_size)
+
+head(cpgs_list)
+print("Head of our CpGs list")
+
+head(cpgs_from_papers)
+print("Head of CpGs from papers table")
+
+```
+
+List of CpGs from literature missing in our data
+```{r}
+cpgs_from_papers$cpg[!(cpgs_from_papers$cpg %in% cpgs_list)]
+print(paste("In total we are missing ", sum(!(cpgs_from_papers$cpg %in% cpgs_list))," CpGs", sep = ""))
+```
+
+```{r}
+# calculating delta betas in our data
+delta_beta_A = abs(adjusted_modelA_case_mean - adjusted_modelA_control_mean)
+delta_beta_B = abs(adjusted_modelB_case_mean - adjusted_modelB_control_mean)
+
+###(!!!)###
+# calculating effect sizes in cohen d in our data
+es_data_A = delta_beta_A[[1]]/pooled_sd_A[[1]]
+es_data_B = delta_beta_B[[1]]/pooled_sd_B[[1]]
+
+# compiling a dataset
+es_data = data.frame(cpgs_list,delta_beta_A, delta_beta_B,pooled_sd_A[,1],pooled_sd_B[,1], es_data_A, es_data_B)
+
+colnames(es_data)[1] = "cpg"
+colnames(es_data)[4:5] = c("pooled_sd_A", "pooled_sd_B")
+
+es_data = es_data[which(es_data$cpg %in% cpgs_from_papers$cpg),]
+es_data = es_data[match(cpgs_from_papers$cpg,es_data$cpg),]
+
+es_data = cbind(cpgs_from_papers,es_data[,-1])
+
+es_data$es_papers_A = abs(es_data$effect_size)/es_data$pooled_sd_A
+es_data$es_papers_B = abs(es_data$effect_size)/es_data$pooled_sd_B
+
+es_data$power_data_A = c()
+es_data$power_data_B = c()
+
+for (i in 1:599) {
+  if (!(is.na(es_data$es_data_A[i]))) {
+    es_data$power_data_A[i] = 
+      (pwr.t2n.test(n1 = ds$`n, case`[1], n2 = ds$`n, controls`[1], d = es_data$es_data_A[i], sig.level = 0.05/832813))$power
+    es_data$power_data_B[i] = 
+      (pwr.t2n.test(n1 = ds$`n, case`[2], n2 = ds$`n, controls`[2], d = es_data$es_data_B[i], sig.level = 0.05/832813))$power
+  } else {
+    es_data$power_data_A[i] = NA
+    es_data$power_data_B[i] = NA
+    }
+}
+
+es_data$power_papers_ANC = c()
+es_data$power_papers_BNC = c()
+
+for (i in 1:599) {
+  if (!(is.na(es_data$es_papers_A[i])) & !(is.nan(es_data$es_papers_A[i]))) {
+    es_data$power_papers_ANC[i] = 
+      (pwr.t2n.test(n1 = ds$`n, case`[1], n2 = ds$`n, controls`[1], d = es_data$es_papers_A[i], sig.level = 0.05))$power
+    es_data$power_papers_BNC[i] = 
+      (pwr.t2n.test(n1 = ds$`n, case`[2], n2 = ds$`n, controls`[2], d = es_data$es_papers_B[i], sig.level = 0.05))$power
+  } else {
+    es_data$power_papers_ANC[i] = NA
+    es_data$power_papers_BNC[i] = NA
+    }
+}
+
+for (i in 1:599) {
+  if (!(is.na(es_data$es_papers_A[i])) & !(is.nan(es_data$es_papers_A[i]))) {
+    es_data$power_papers_A413[i] = 
+      (pwr.t2n.test(n1 = ds$`n, case`[1], n2 = ds$`n, controls`[1], d = es_data$es_papers_A[i], sig.level = 0.05/413))$power
+    es_data$power_papers_B413[i] = 
+      (pwr.t2n.test(n1 = ds$`n, case`[2], n2 = ds$`n, controls`[2], d = es_data$es_papers_B[i], sig.level = 0.05/413))$power
+  } else {
+    es_data$power_papers_A413[i] = NA
+    es_data$power_papers_B413[i] = NA
+    }
+}
+
+fwrite(as.data.frame(es_data), paste(results_path,"calculated_powers_papers.csv", sep=""),col.names = TRUE)
+```
+
