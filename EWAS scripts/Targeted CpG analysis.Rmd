@@ -82,27 +82,27 @@ Step 4: Interrogation of heat-stress associated CpGs (Xu et al)
 ```{r}
 ## 365 days of heat
 Heat_365_modelA <- left_join(HeatstressCpGs365, modelA_target[, c("rowname","transitioned", "lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Heat_365_modelA <- na.omit(Heat_365_modelA)
+Heat_365_modelA <- drop_na(Heat_365_modelA, Significant)
 Heat_365_modelA <- arrange(Heat_365_modelA, desc(Significant))
 Heat_365_modelA <- mutate(Heat_365_modelA, `Beta congruent and significant` ="N" )
 Heat_365_modelA$`Beta congruent and significant`[(Heat_365_modelA$Beta=="+" & Heat_365_modelA$transitioned>0 & Heat_365_modelA$Significant=="Y")|(Heat_365_modelA$Beta=="-" & Heat_365_modelA$transitioned<0 & Heat_365_modelA$Significant=="Y")]  <- "Y"
 
 
 Heat_365_modelB <- left_join(HeatstressCpGs365,modelB_target[,c("rowname","transitioned","lower", "upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Heat_365_modelB <- na.omit(Heat_365_modelB)
+Heat_365_modelB <- drop_na(Heat_365_modelB, Significant)
 Heat_365_modelB <- arrange(Heat_365_modelB, desc(Significant))
 Heat_365_modelB <- mutate(Heat_365_modelB, `Beta congruent and significant` ="N" )
 Heat_365_modelB$`Beta congruent and significant`[(Heat_365_modelB$Beta=="+" & Heat_365_modelB$transitioned>0 & Heat_365_modelB$Significant=="Y")|(Heat_365_modelB$Beta=="-" & Heat_365_modelB$transitioned<0 & Heat_365_modelB$Significant=="Y")]  <- "Y"
 
 ## 180 days of heat
 Heat_180_modelA <- left_join(HeatstressCpGs180, modelA_target[, c("rowname","transitioned", "lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Heat_180_modelA <- na.omit(Heat_180_modelA)
+Heat_180_modelA <- drop_na(Heat_180_modelA, Significant)
 Heat_180_modelA <- arrange(Heat_180_modelA, desc(Significant))
 Heat_180_modelA <- mutate(Heat_180_modelA, `Beta congruent and significant` ="N" )
 Heat_180_modelA$`Beta congruent and significant`[(Heat_180_modelA$Beta=="+" & Heat_180_modelA$transitioned>0 & Heat_180_modelA$Significant=="Y")|(Heat_180_modelA$Beta=="-" & Heat_180_modelA$transitioned<0 & Heat_180_modelA$Significant=="Y")]  <- "Y"
 
 Heat_180_modelB <- left_join(HeatstressCpGs180,modelB_target[,c("rowname","transitioned","lower", "upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Heat_180_modelB <- na.omit(Heat_180_modelB)
+Heat_180_modelB <- drop_na(Heat_180_modelB, Significant)
 Heat_180_modelB <- arrange(Heat_180_modelB, desc(Significant))
 Heat_180_modelB <- mutate(Heat_180_modelB, `Beta congruent and significant` ="N" )
 Heat_180_modelB$`Beta congruent and significant`[(Heat_180_modelB$Beta=="+" & Heat_180_modelB$transitioned>0 & Heat_180_modelB$Significant=="Y")|(Heat_180_modelB$Beta=="-" & Heat_180_modelB$transitioned<0 & Heat_180_modelB$Significant=="Y")]  <- "Y"
@@ -118,14 +118,14 @@ Step 5: Interrogation of pesticide associated CpGs p-values.
 ```{r}
 ## Paul et al, Organophosphates. 
 OrgPO4_modelA <- left_join(OrgPO4_CpGs_paul, modelA_target[, c("rowname","transitioned","lower", "upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-OrgPO4_modelA <- na.omit(OrgPO4_modelA)
+OrgPO4_modelA <- drop_na(OrgPO4_modelA, Significant)
 OrgPO4_modelA <- arrange(OrgPO4_modelA, desc(Significant))
 OrgPO4_modelA <- mutate(OrgPO4_modelA, `Beta congruent and significant` ="N" )
 OrgPO4_modelA$`Beta congruent and significant`[(OrgPO4_modelA$Beta=="+" & OrgPO4_modelA$transitioned>0 & OrgPO4_modelA$Significant=="Y")|(OrgPO4_modelA$Beta=="-" & OrgPO4_modelA$transitioned<0 & OrgPO4_modelA$Significant=="Y")]  <- "Y"
 
 
 OrgPO4_modelB <- left_join(OrgPO4_CpGs_paul, modelB_target[, c("rowname","transitioned","lower", "upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-OrgPO4_modelB <- na.omit(OrgPO4_modelB)
+OrgPO4_modelB <- drop_na(OrgPO4_modelB, Significant)
 OrgPO4_modelB <- arrange(OrgPO4_modelB, desc(Significant))
 OrgPO4_modelB <- mutate(OrgPO4_modelB, `Beta congruent and significant` ="N" )
 OrgPO4_modelB$`Beta congruent and significant`[(OrgPO4_modelB$Beta=="+" & OrgPO4_modelB$transitioned>0 & OrgPO4_modelB$Significant=="Y")|(OrgPO4_modelB$Beta=="-" & OrgPO4_modelB$transitioned<0 & OrgPO4_modelB$Significant=="Y")]  <- "Y" 
@@ -133,14 +133,14 @@ OrgPO4_modelB$`Beta congruent and significant`[(OrgPO4_modelB$Beta=="+" & OrgPO4
 
 ## Furlong et al, Pyrethroid. 
 Pyrethroid_modelA <- left_join(Pyrethroid_CpGs_furlong , modelA_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Pyrethroid_modelA <- na.omit(Pyrethroid_modelA)
+Pyrethroid_modelA <- drop_na(Pyrethroid_modelA, Significant)
 Pyrethroid_modelA <- arrange(Pyrethroid_modelA, desc(Significant))
 Pyrethroid_modelA <- mutate(Pyrethroid_modelA, `Beta congruent and significant` ="N" )
 Pyrethroid_modelA$`Beta congruent and significant`[(Pyrethroid_modelA$Beta=="+" & Pyrethroid_modelA$transitioned>0 & Pyrethroid_modelA$Significant=="Y")|(Pyrethroid_modelA$Beta=="-" & Pyrethroid_modelA$transitioned<0 & Pyrethroid_modelA$Significant=="Y")]  <- "Y"
 
 
 Pyrethroid_modelB <- left_join(Pyrethroid_CpGs_furlong , modelB_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Pyrethroid_modelB <- na.omit(Pyrethroid_modelB)
+Pyrethroid_modelB <- drop_na(Pyrethroid_modelB, Significant)
 Pyrethroid_modelB <- arrange(Pyrethroid_modelB, desc(Significant))
 Pyrethroid_modelB <- mutate(Pyrethroid_modelB, `Beta congruent and significant` ="N" )
 Pyrethroid_modelB$`Beta congruent and significant`[(Pyrethroid_modelB$Beta=="+" & Pyrethroid_modelB$transitioned>0 & Pyrethroid_modelB$Significant=="Y")|(Pyrethroid_modelB$Beta=="-" & Pyrethroid_modelB$transitioned<0 & Pyrethroid_modelB$Significant=="Y")]  <- "Y" 
@@ -149,14 +149,14 @@ Pyrethroid_modelB$`Beta congruent and significant`[(Pyrethroid_modelB$Beta=="+" 
 
 ## Hoang et al, multiple pesticides
 Mixed_pesticides_modelA <- left_join(Pesticides_hoang, modelA_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Mixed_pesticides_modelA <-na.omit(Mixed_pesticides_modelA)
+Mixed_pesticides_modelA <- drop_na(Mixed_pesticides_modelA, Significant)
 mixed_pesticides_modelA <- arrange(Mixed_pesticides_modelA, desc(Significant))
 Mixed_pesticides_modelA <- mutate(Mixed_pesticides_modelA, `Beta congruent and significant` ="N" )
 Mixed_pesticides_modelA$`Beta congruent and significant`[(Mixed_pesticides_modelA$Beta=="+" & Mixed_pesticides_modelA$transitioned>0 & Mixed_pesticides_modelA$Significant=="Y")|(Mixed_pesticides_modelA$Beta=="-" & Mixed_pesticides_modelA$transitioned<0 & Mixed_pesticides_modelA$Significant=="Y")]  <- "Y"
 
 
 Mixed_pesticides_modelB <- left_join(Pesticides_hoang, modelB_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Mixed_pesticides_modelB <-na.omit(Mixed_pesticides_modelB)
+Mixed_pesticides_modelB <- drop_na(Mixed_pesticides_modelB, Significant)
 Mixed_pesticides_modelB <- arrange(Mixed_pesticides_modelB, desc(Significant))
 Mixed_pesticides_modelB <- mutate(Mixed_pesticides_modelB, `Beta congruent and significant` ="N" )
 Mixed_pesticides_modelB$`Beta congruent and significant`[(Mixed_pesticides_modelB$Beta=="+" & Mixed_pesticides_modelB$transitioned>0 & Mixed_pesticides_modelB$Significant=="Y")|(Mixed_pesticides_modelB$Beta=="-" & Mixed_pesticides_modelB$transitioned<0 & Mixed_pesticides_modelB$Significant=="Y")]   <- "Y"
@@ -175,14 +175,14 @@ Step 6: Interrogation of Arsenic associated CpGs.
 ```{r}
 ## Argos et al (2015)
 Arsenic_Argos_modelA <- left_join(Arsenic_Argos, modelA_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Arsenic_Argos_modelA <- na.omit(Arsenic_Argos_modelA)
+Arsenic_Argos_modelA <- drop_na(Arsenic_Argos_modelA, Significant)
 Arsenic_Argos_modelA <- arrange(Arsenic_Argos_modelA, desc(Significant))
 Arsenic_Argos_modelA <- mutate(Arsenic_Argos_modelA, `Beta congruent and significant` ="N" )
 Arsenic_Argos_modelA$`Beta congruent and significant`[(Arsenic_Argos_modelA$Beta=="+" & Arsenic_Argos_modelA$transitioned>0 & Arsenic_Argos_modelA$Significant=="Y")|(Arsenic_Argos_modelA$Beta=="-" & Arsenic_Argos_modelA$transitioned<0 & Arsenic_Argos_modelA$Significant=="Y")]  <- "Y"
 
 
 Arsenic_Argos_modelB <- left_join(Arsenic_Argos, modelB_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Arsenic_Argos_modelB <- na.omit(Arsenic_Argos_modelB)
+Arsenic_Argos_modelB <- drop_na(Arsenic_Argos_modelB, Significant)
 Arsenic_Argos_modelB <- arrange(Arsenic_Argos_modelB, desc(Significant))
 Arsenic_Argos_modelB <- mutate(Arsenic_Argos_modelB, `Beta congruent and significant` ="N" )
 Arsenic_Argos_modelB$`Beta congruent and significant`[(Arsenic_Argos_modelB$Beta=="+" & Arsenic_Argos_modelB$transitioned>0 & Arsenic_Argos_modelB$Significant=="Y")|(Arsenic_Argos_modelB$Beta=="-" & Arsenic_Argos_modelB$transitioned<0 & Arsenic_Argos_modelB$Significant=="Y")]  <- "Y" 
@@ -190,14 +190,14 @@ Arsenic_Argos_modelB$`Beta congruent and significant`[(Arsenic_Argos_modelB$Beta
 
 ## Ameer et al (2017)
 Arsenic_Ameer_modelA <- left_join(Arsenic_Ameer, modelA_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Arsenic_Ameer_modelA <- na.omit(Arsenic_Ameer_modelA)
+Arsenic_Ameer_modelA <- drop_na(Arsenic_Ameer_modelA, Significant)
 Arsenic_Ameer_modelA <- arrange(Arsenic_Ameer_modelA, desc(Significant))
 Arsenic_Ameer_modelA <- mutate(Arsenic_Ameer_modelA, `Beta congruent and significant` ="N" )
 Arsenic_Ameer_modelA$`Beta congruent and significant`[(Arsenic_Ameer_modelA$Beta=="+" & Arsenic_Ameer_modelA$transitioned>0 & Arsenic_Ameer_modelA$Significant=="Y")|(Arsenic_Ameer_modelA$Beta=="-" & Arsenic_Ameer_modelA$transitioned<0 & Arsenic_Ameer_modelA$Significant=="Y")]  <- "Y"
 
 
 Arsenic_Ameer_modelB <- left_join(Arsenic_Ameer, modelB_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Arsenic_Ameer_modelB <- na.omit(Arsenic_Ameer_modelB)
+Arsenic_Ameer_modelB <- drop_na(Arsenic_Ameer_modelB, Significant) 
 Arsenic_Ameer_modelB <- arrange(Arsenic_Ameer_modelB, desc(Significant))
 Arsenic_Ameer_modelB <- mutate(Arsenic_Ameer_modelB, `Beta congruent and significant` ="N" )
 Arsenic_Ameer_modelB$`Beta congruent and significant`[(Arsenic_Ameer_modelB$Beta=="+" & Arsenic_Ameer_modelB$transitioned>0 & Arsenic_Ameer_modelB$Significant=="Y")|(Arsenic_Ameer_modelB$Beta=="-" & Arsenic_Ameer_modelB$transitioned<0 & Arsenic_Ameer_modelB$Significant=="Y")]  <- "Y" 
@@ -205,14 +205,14 @@ Arsenic_Ameer_modelB$`Beta congruent and significant`[(Arsenic_Ameer_modelB$Beta
 
 ## Demanelis et al (2019) 
 Arsenic_Demanelis_modelA <- left_join(Arsenic_Demanelis, modelA_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Arsenic_Demanelis_modelA <- na.omit(Arsenic_Demanelis_modelA)
+Arsenic_Demanelis_modelA <- drop_na(Arsenic_Demanelis_modelA, Significant)
 Arsenic_Demanelis_modelA <- arrange(Arsenic_Demanelis_modelA, desc(Significant))
 Arsenic_Demanelis_modelA <- mutate(Arsenic_Demanelis_modelA, `Beta congruent and significant` ="N" )
 Arsenic_Demanelis_modelA$`Beta congruent and significant`[(Arsenic_Demanelis_modelA$Beta=="+" & Arsenic_Demanelis_modelA$transitioned>0 & Arsenic_Demanelis_modelA$Significant=="Y")|(Arsenic_Demanelis_modelA$Beta=="-" & Arsenic_Demanelis_modelA$transitioned<0 & Arsenic_Demanelis_modelA$Significant=="Y")]  <- "Y"
 
 
 Arsenic_Demanelis_modelB <- left_join(Arsenic_Demanelis, modelB_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Arsenic_Demanelis_modelB <- na.omit(Arsenic_Demanelis_modelB)
+Arsenic_Demanelis_modelB <- drop_na(Arsenic_Demanelis_modelB, Significant)
 Arsenic_Demanelis_modelB <- arrange(Arsenic_Demanelis_modelB, desc(Significant))
 Arsenic_Demanelis_modelB <- mutate(Arsenic_Demanelis_modelB, `Beta congruent and significant` ="N" )
 Arsenic_Demanelis_modelB$`Beta congruent and significant`[(Arsenic_Demanelis_modelB$Beta=="+" & Arsenic_Demanelis_modelB$transitioned>0 & Arsenic_Demanelis_modelB$Significant=="Y")|(Arsenic_Demanelis_modelB$Beta=="-" & Arsenic_Demanelis_modelB$transitioned<0 & Arsenic_Demanelis_modelB$Significant=="Y")]  <- "Y" 
@@ -220,14 +220,14 @@ Arsenic_Demanelis_modelB$`Beta congruent and significant`[(Arsenic_Demanelis_mod
 
 ## Bozack et al (2020)
 Arsenic_Bozack_modelA <- left_join(Arsenic_Bozack, modelA_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Arsenic_Bozack_modelA <- na.omit(Arsenic_Bozack_modelA)
+Arsenic_Bozack_modelA <- drop_na(Arsenic_Bozack_modelA, Significant)
 Arsenic_Bozack_modelA <- arrange(Arsenic_Bozack_modelA, desc(Significant))
 Arsenic_Bozack_modelA <- mutate(Arsenic_Bozack_modelA, `Beta congruent and significant` ="N" )
 Arsenic_Bozack_modelA$`Beta congruent and significant`[(Arsenic_Bozack_modelA$Beta=="+" & Arsenic_Bozack_modelA$transitioned>0 & Arsenic_Bozack_modelA$Significant=="Y")|(Arsenic_Bozack_modelA$Beta=="-" & Arsenic_Bozack_modelA$transitioned<0 & Arsenic_Bozack_modelA$Significant=="Y")]  <- "Y"
 
 
 Arsenic_Bozack_modelB <- left_join(Arsenic_Bozack, modelB_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Arsenic_Bozack_modelB <- na.omit(Arsenic_Bozack_modelB)
+Arsenic_Bozack_modelB <- drop_na(Arsenic_Bozack_modelB, Significant)
 Arsenic_Bozack_modelB <- arrange(Arsenic_Bozack_modelB, desc(Significant))
 Arsenic_Bozack_modelB <- mutate(Arsenic_Bozack_modelB, `Beta congruent and significant` ="N" )
 Arsenic_Bozack_modelB$`Beta congruent and significant`[(Arsenic_Bozack_modelB$Beta=="+" & Arsenic_Bozack_modelB$transitioned>0 & Arsenic_Bozack_modelB$Significant=="Y")|(Arsenic_Bozack_modelB$Beta=="-" & Arsenic_Bozack_modelB$transitioned<0 & Arsenic_Bozack_modelB$Significant=="Y")]  <- "Y" 
@@ -249,14 +249,14 @@ Step 7: Interrogation of other metals associated CpGs.
 ```{r}
 ## Chromium, Feng et al (2020)
 Chromium_Feng_modelA <- left_join(Chromium_Feng, modelA_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Chromium_Feng_modelA <- na.omit(Chromium_Feng_modelA)
+Chromium_Feng_modelA <- drop_na(Chromium_Feng_modelA, Significant)
 Chromium_Feng_modelA <- arrange(Chromium_Feng_modelA, desc(Significant))
 Chromium_Feng_modelA <- mutate(Chromium_Feng_modelA, `Beta congruent and significant` ="N" )
 Chromium_Feng_modelA$`Beta congruent and significant`[(Chromium_Feng_modelA$Beta=="+" & Chromium_Feng_modelA$transitioned>0 & Chromium_Feng_modelA$Significant=="Y")|(Chromium_Feng_modelA$Beta=="-" & Chromium_Feng_modelA$transitioned<0 & Chromium_Feng_modelA$Significant=="Y")]  <- "Y"
 
 
 Chromium_Feng_modelB <- left_join(Chromium_Feng, modelB_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Chromium_Feng_modelB <- na.omit(Chromium_Feng_modelB)
+Chromium_Feng_modelB <- drop_na(Chromium_Feng_modelB, Significant)
 Chromium_Feng_modelB <- arrange(Chromium_Feng_modelB, desc(Significant))
 Chromium_Feng_modelB <- mutate(Chromium_Feng_modelB, `Beta congruent and significant` ="N" )
 Chromium_Feng_modelB$`Beta congruent and significant`[(Chromium_Feng_modelB$Beta=="+" & Chromium_Feng_modelB$transitioned>0 & Chromium_Feng_modelB$Significant=="Y")|(Chromium_Feng_modelB$Beta=="-" & Chromium_Feng_modelB$transitioned<0 & Chromium_Feng_modelB$Significant=="Y")]  <- "Y" 
@@ -265,14 +265,14 @@ Chromium_Feng_modelB$`Beta congruent and significant`[(Chromium_Feng_modelB$Beta
 
 ## Cadmium, 
 Cadmium_Domingo_modelA <- left_join(Cadmium_Domingo, modelA_target[, c("rowname","transitioned","lower","upper","p-value", "Significant")], by = c("CpG" = "rowname"))
-Cadmium_Domingo_modelA <- na.omit(Cadmium_Domingo_modelA)
+Cadmium_Domingo_modelA <- drop_na(Cadmium_Domingo_modelA, Significant)
 Cadmium_Domingo_modelA <- arrange(Cadmium_Domingo_modelA, desc(Significant))
 Cadmium_Domingo_modelA <- mutate(Cadmium_Domingo_modelA, `Beta congruent and significant` ="N" )
 Cadmium_Domingo_modelA$`Beta congruent and significant`[(Cadmium_Domingo_modelA$Beta=="+" & Cadmium_Domingo_modelA$transitioned>0 & Cadmium_Domingo_modelA$Significant=="Y")|(Cadmium_Domingo_modelA$Beta=="-" & Cadmium_Domingo_modelA$transitioned<0 & Cadmium_Domingo_modelA$Significant=="Y")]  <- "Y"
 
 
 Cadmium_Domingo_modelB <- left_join(Cadmium_Domingo, modelB_target[, c("rowname","transitioned","lower","upper", "p-value", "Significant")], by = c("CpG" = "rowname"))
-Cadmium_Domingo_modelB <- na.omit(Cadmium_Domingo_modelB)
+Cadmium_Domingo_modelB <- drop_na(Cadmium_Domingo_modelB, Significant)
 Cadmium_Domingo_modelB <- arrange(Cadmium_Domingo_modelB, desc(Significant))
 Cadmium_Domingo_modelB <- mutate(Cadmium_Domingo_modelB, `Beta congruent and significant` ="N" )
 Cadmium_Domingo_modelB$`Beta congruent and significant`[(Cadmium_Domingo_modelB$Beta=="+" & Cadmium_Domingo_modelB$transitioned>0 & Cadmium_Domingo_modelB$Significant=="Y")|(Cadmium_Domingo_modelB$Beta=="-" & Cadmium_Domingo_modelB$transitioned<0 & Cadmium_Domingo_modelB$Significant=="Y")]  <- "Y" 
